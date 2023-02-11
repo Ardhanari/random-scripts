@@ -18,35 +18,11 @@
 from __future__ import annotations
 import datetime 
 import re
+
 from variables import XML_PROD_FILEPATH, XML_TESTING_FILEPATH, GENERATED_HTML_FILEPATH, OPENING_TAGS, CLOSING_TAGS
 
-testing = False
-
-if testing: 
-    file_to_parse = XML_TESTING_FILEPATH
-else:
-    file_to_parse = XML_PROD_FILEPATH
-
-with open(file_to_parse, "r", encoding="utf-8", errors="strict") as lst:
-    raw_items = lst.readlines()
-
-# Loop for yeeting empty lines or single linebreaks 
-pattern = r"(^<wp:status>.+)|(^<wp:post_type>.+)|(^<category.+)|(^<excerpt:encoded>.+)|(^<description>.+)|(^<wp:post_date_gmt>.+)"
-for i in raw_items: 
-    print("---------")
-    print(i.lstrip())
-    if re.match(pattern, i.lstrip()) is not None or i == "\n" or i == '':    
-        index_of_i = raw_items.index(i)
-        trash = raw_items.pop(index_of_i)  # I realised this means one index number will be skipped aaaaaa TODO: rewrite this with append not-trash instead of pop trash
-        print(f"trash was {trash} and is now gone")
-
-# outcome needs to be nested list (list of lists), where each nested list is a single blog item
-list_of_items = []
-# list_o_items = [['item title', 'item content', 'item date', 'item signature'], ['item title', 'item content', 'item date', 'item signature'], ...]
-# list_of_items = [sublist, sublist, sublist, ...]  
 
 def format_date(date_line) -> tuple[str, str]:
-    # date_and_time = re.match(r"(^<wp:post_date_gmt>)(.+?)(<\/wp:post_date_gmt>)", date_line).group(2)
     date_and_time = re.match(r"(^<pubDate>)(.+?)(<\/pubDate>)", date_line).group(2)
     dt = datetime.datetime.strptime(date_and_time, '%Y-%m-%dT%H:%M:%S')
     date = "<p class=\"date\">" + dt.strftime("%A, %d %B %Y") + "</p>\n"
@@ -57,7 +33,6 @@ def format_date(date_line) -> tuple[str, str]:
 def format_content(content_line) -> str:
     if re.match(r"^<content:encoded>", content_line):
         content = re.match(r"(^<content:encoded><!\[CDATA\[)(.+)", content_line).group(2)
-        # content = content.decode(encoding='UTF-8',errors='strict')
     elif re.match(r"(^.+?)(]]><\/content:encoded>$)", content_line):
         content = re.match(r"(^.+?)(]]><\/content:encoded>$)", content_line).group(1)
     else:
@@ -68,11 +43,11 @@ def format_title(title_line) -> str:
     title = "<h2>" + re.match(r"(^<title>)(.+?)(<\/title>)", title_line).group(2) + "</h2>"
     return title
 
-# attempt to segregate it into separate items
+# function to segregate raw_lines into separate items
 def segregate_lines_into_items(arr) -> tuple[list, int]:
     sublists_counter = 0
 
-    # temporary variables, cleared after each <item> with clear_variable()
+    # temporary variables for storing content of each sublist
     sublist = [] 
     title_string = ""
     content_string = "" # this will have all lines of content appended
@@ -87,7 +62,6 @@ def segregate_lines_into_items(arr) -> tuple[list, int]:
             elif re.match(r"^<title>", thing):
                 # TODO: format title
                 title_string += format_title(thing)
-            # elif re.match(r"^<wp:post_date_gmt>", thing):
             elif re.match(r"(^<pubDate>)(.+?)(<\/pubDate>)", thing):
                 # TODO: format date and time strings
                 item_date, item_signature = format_date(thing)
@@ -98,7 +72,7 @@ def segregate_lines_into_items(arr) -> tuple[list, int]:
                 content_string += format_content(thing)
         else: 
             # loop found item closing tag
-            # add everything collected so far to the final list and purge temp data and start a new item
+            # add everything collected so far to the final list
             sublists_counter += 1
             sublist = [item_date, title_string, content_string, item_signature]
             list_of_items.append(sublist)
@@ -112,9 +86,37 @@ def segregate_lines_into_items(arr) -> tuple[list, int]:
     
     return list_of_items, sublists_counter
 
+testing = True
+
+if testing: 
+    file_to_parse = XML_TESTING_FILEPATH
+else:
+    file_to_parse = XML_PROD_FILEPATH
+
+with open(file_to_parse, "r", encoding="utf-8", errors="strict") as lst:
+    raw_items = lst.readlines()
+
+# Loop for yeeting empty lines, single linebreaks or not needed tags
+pattern = r"(^<wp:status>.+)|(^<wp:post_type>.+)|(^<category.+)|(^<excerpt:encoded>.+)|(^<description>.+)|(^<wp:post_date_gmt>.+)"
+for i in raw_items: 
+    if re.match(pattern, i.lstrip()) is not None or i == "\n" or i == '':    
+        index_of_i = raw_items.index(i)
+        trash = raw_items.pop(index_of_i)  # I realised this means one index number will be skipped aaaaaa TODO: rewrite this with append not-trash instead of pop trash
+        print(f"trash was {trash} and is now gone")
+
+# outcome needs to be nested list (list of lists), where each nested list is a single blog item
+list_of_items = []
+# list_o_items = [['item title', 'item content', 'item date', 'item signature'], ['item title', 'item content', 'item date', 'item signature'], ...]
+# list_of_items = [sublist, sublist, sublist, ...]  
+
 list_of_items, sublists_counter = segregate_lines_into_items(raw_items)
 print(f"Did total of {sublists_counter} items, and the list of items has length of {list_of_items.__len__()}")
 
+# TODO: reverse list_of_items so it starts with the earliest post
+# TODO: only need posts from Novemver 2013 onwards
+
+# With all items sorted in list_of_items, write them to a new html file
+# imported variables contain all the HTML code needed around the content to display and print properly
 with open(GENERATED_HTML_FILEPATH, "w", encoding="utf-8", errors="strict") as f:
     f.write(OPENING_TAGS)
     for each in list_of_items: 
