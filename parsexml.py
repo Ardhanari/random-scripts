@@ -18,21 +18,27 @@
 from __future__ import annotations
 import datetime 
 import re
-from variables import XML_TESTING_FILEPATH, GENERATED_HTML_FILEPATH, OPENING_TAGS, CLOSING_TAGS
+from variables import XML_PROD_FILEPATH, XML_TESTING_FILEPATH, GENERATED_HTML_FILEPATH, OPENING_TAGS, CLOSING_TAGS
 
-file_to_parse = XML_TESTING_FILEPATH # opens as a list HO
+testing = False
 
-with open(file_to_parse, "r") as lst:
+if testing: 
+    file_to_parse = XML_TESTING_FILEPATH
+else:
+    file_to_parse = XML_PROD_FILEPATH
+
+with open(file_to_parse, "r", encoding="utf-8", errors="strict") as lst:
     raw_items = lst.readlines()
 
 # Loop for yeeting empty lines or single linebreaks 
+pattern = r"(^<wp:status>.+)|(^<wp:post_type>.+)|(^<category.+)|(^<excerpt:encoded>.+)|(^<description>.+)|(^<wp:post_date_gmt>.+)"
 for i in raw_items: 
-    if i == "\n" or i == '':
+    print("---------")
+    print(i.lstrip())
+    if re.match(pattern, i.lstrip()) is not None or i == "\n" or i == '':    
         index_of_i = raw_items.index(i)
-        trash = raw_items.pop(index_of_i)
-        print("trash is now gone")
-
-print(raw_items[0]) # check first item after deleting trash # tb deleted later
+        trash = raw_items.pop(index_of_i)  # I realised this means one index number will be skipped aaaaaa TODO: rewrite this with append not-trash instead of pop trash
+        print(f"trash was {trash} and is now gone")
 
 # outcome needs to be nested list (list of lists), where each nested list is a single blog item
 list_of_items = []
@@ -40,8 +46,9 @@ list_of_items = []
 # list_of_items = [sublist, sublist, sublist, ...]  
 
 def format_date(date_line) -> tuple[str, str]:
-    date_and_time = re.match(r"(^<wp:post_date_gmt>)(.+?)(<\/wp:post_date_gmt>)", date_line).group(2)
-    dt = datetime.datetime.strptime(date_and_time, '%Y-%m-%d %H:%M:%S')
+    # date_and_time = re.match(r"(^<wp:post_date_gmt>)(.+?)(<\/wp:post_date_gmt>)", date_line).group(2)
+    date_and_time = re.match(r"(^<pubDate>)(.+?)(<\/pubDate>)", date_line).group(2)
+    dt = datetime.datetime.strptime(date_and_time, '%Y-%m-%dT%H:%M:%S')
     date = "<p class=\"date\">" + dt.strftime("%A, %d %B %Y") + "</p>\n"
     time = dt.strftime("%H:%M")
     author_and_time = f"<p class=\"time\">{time}, never.easy</p>\n"
@@ -80,7 +87,8 @@ def segregate_lines_into_items(arr) -> tuple[list, int]:
             elif re.match(r"^<title>", thing):
                 # TODO: format title
                 title_string += format_title(thing)
-            elif re.match(r"^<wp:post_date_gmt>", thing):
+            # elif re.match(r"^<wp:post_date_gmt>", thing):
+            elif re.match(r"(^<pubDate>)(.+?)(<\/pubDate>)", thing):
                 # TODO: format date and time strings
                 item_date, item_signature = format_date(thing)
             elif re.match(r"^<content:encoded>", thing):
@@ -107,7 +115,7 @@ def segregate_lines_into_items(arr) -> tuple[list, int]:
 list_of_items, sublists_counter = segregate_lines_into_items(raw_items)
 print(f"Did total of {sublists_counter} items, and the list of items has length of {list_of_items.__len__()}")
 
-with open(GENERATED_HTML_FILEPATH, "w") as f:
+with open(GENERATED_HTML_FILEPATH, "w", encoding="utf-8", errors="strict") as f:
     f.write(OPENING_TAGS)
     for each in list_of_items: 
         for i in each: 
