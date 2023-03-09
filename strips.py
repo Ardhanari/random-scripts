@@ -1,6 +1,9 @@
 """
-This code gets a response from a given url, searches through it to find an image and button to the next page using regex (consts RE_IMG_SRC and RE_NEXT_PAGE are regex pattern to isolate links to both).
-Then saves an image to local drive (path given through SAVE_TO const) using save_to_drive(image_url) function - and, after a short sleep, continues to the next page to repeat the process. 
+This code gets a response from a given url, searches through it to find an image and button to the next page using regex
+(consts RE_IMG_SRC and RE_NEXT_PAGE are regex pattern to isolate links to both).
+Then saves an image to local drive (path given through SAVE_TO const) using save_to_drive(image_url) function.
+After a short sleep, continues to the next page to repeat the process. 
+
 After there's no more 'next_page' link, loop breaks with IndexError trying to read from regex result list the link to next page when the list is of length 0. 
 """
 from time import sleep
@@ -15,9 +18,9 @@ def save_to_drive(img_to_save):
     if img_res.status_code == 200:
         with open(SAVE_TO + file_name,'wb') as f:
             shutil.copyfileobj(img_res.raw, f)
-        print('Yay, strip saved: ',file_name)
+        print('Yay, file saved: ',file_name)
     else:
-        print('Couldn\'t save a strip :(\n Status code: ', str(img_res.status_code))
+        print('Couldn\'t save a file :(\n Status code: ', str(img_res.status_code))
 
 current_page = PATH
 
@@ -25,7 +28,7 @@ current_page = PATH
 while True:
 
     # 1 - take url and return the content of the website
-    stripfield_page = requests.get(current_page) # stripfield_page -> HTTP response / .text -> full code
+    stripfield_page = requests.get(current_page) # stripfield_page -> HTTP response / .text -> full page content
 
     # 2 - find URL of img
     imgs_found = re.findall(RE_IMG_SRC, stripfield_page.text)
@@ -48,4 +51,4 @@ while True:
     # 5a - pretend you're human
     sleep(3)
     print("Woke up! Trying the next iteration...")
-    # 5 - rinse and repeat
+    # 5b - rinse and repeat
